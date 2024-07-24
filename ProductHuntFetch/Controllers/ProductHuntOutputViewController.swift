@@ -10,6 +10,8 @@ import UIKit
 
 class ProductHuntOutputViewController: UIViewController {
     
+    var images: [UIImage] = []
+    
     private lazy var tableView: UITableView = {
         let tableView = UITableView(frame: .zero, style: .plain)
         tableView.translatesAutoresizingMaskIntoConstraints = false
@@ -33,6 +35,20 @@ class ProductHuntOutputViewController: UIViewController {
         super.viewDidLoad()
         
         setup()
+        
+        Task {
+            let (_, imageURLs) = try await networkServiceProtocol.performRequest()
+            print("Image URLS \(imageURLs)")
+            for await image in await networkServiceProtocol.fetchImagesConcurrently(urls: imageURLs) {
+                if let image = image {
+                    self.images.append(image)
+                    let indexPath = IndexPath(row: images.count - 1, section: 0)
+                    self.tableView.insertRows(at: [indexPath], with: .automatic)
+                    
+                }
+            }
+            
+        }
     }
 }
 
@@ -55,17 +71,13 @@ extension ProductHuntOutputViewController: UITableViewDataSource {
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         guard let cell = tableView.dequeueReusableCell(withIdentifier: ProductHuntTableViewCell.identifier, for: indexPath) as? ProductHuntTableViewCell else { return UITableViewCell() }
         
-        Task {
-            let (_, imageURLs) = try await networkServiceProtocol.performRequest()
-            print("Image URLS \(imageURLs)")
-            let images = try await networkServiceProtocol.fetchImagesConcurrently(urls: Array(imageURLs.prefix(7)))
-            cell.configure(image: images[indexPath.row])
-        }
+        cell.configure(image: images[indexPath.row])
+
         return cell
     }
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        2
+        images.count
     }
     
     func numberOfSections(in tableView: UITableView) -> Int {

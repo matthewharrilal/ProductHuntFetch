@@ -10,7 +10,7 @@ import UIKit
 
 protocol NetworkServiceProtocol: AnyObject {
     func performRequest() async throws -> ([UnsplashModel], [URL])
-    func fetchImagesConcurrently(urls: [URL]) async -> [UIImage]
+    func fetchImagesConcurrently(urls: [URL]) async -> AsyncStream<UIImage?>
 }
 
 class NetworkServiceImplementation: NetworkServiceProtocol {
@@ -38,31 +38,35 @@ class NetworkServiceImplementation: NetworkServiceProtocol {
         return (unsplashObject, imageURLs)
     }
     
-    func fetchImagesConcurrently(urls: [URL]) async -> [UIImage] {
-        var images: [UIImage] = []
-        
-        await withTaskGroup( // Each task returns optional data
-            of: Data?.self) { taskGroup in
-                for url in urls {
-                    taskGroup.addTask {
-                        do {
-                            return try await self.fetchData(from: url)
-                        }
-                        catch {
-                            print("Error fetching data")
-                            return nil
+    func fetchImagesConcurrently(urls: [URL]) async -> AsyncStream<UIImage?> {
+        AsyncStream { continuation in
+            Task {
+                await withTaskGroup( // Each task returns optional data
+                    of: UIImage?.self) { taskGroup in
+                        for url in urls {
+                            taskGroup.addTask {
+                                do {
+                                    let data = try await self.fetchData(from: url)
+                                    let image = UIImage(data: data)
+                                    return image
+                                    
+                                }
+                                catch {
+                                    print("Error fetching data")
+                                    return nil
+                                }
+                                
+                            }
                         }
                         
+                        for await image in taskGroup {
+                            continuation.yield(image)
+                        }
+                        
+                        continuation.finish()
                     }
-                }
-                
-                for await data in taskGroup {
-                    if let data = data, let image = UIImage(data: data) {
-                        images.append(image)
-                    }
-                }
             }
-        
-        return images
+            
+        }
     }
 }
