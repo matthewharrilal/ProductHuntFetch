@@ -35,20 +35,7 @@ class ProductHuntOutputViewController: UIViewController {
         super.viewDidLoad()
         
         setup()
-        
-        Task {
-            let (_, imageURLs) = try await networkServiceProtocol.performRequest()
-            print("Image URLS \(imageURLs)")
-            for await image in await networkServiceProtocol.fetchImagesConcurrently(urls: imageURLs) {
-                if let image = image {
-                    self.images.append(image)
-                    let indexPath = IndexPath(row: images.count - 1, section: 0)
-                    self.tableView.insertRows(at: [indexPath], with: .automatic)
-                    
-                }
-            }
-            
-        }
+        fetchImages()
     }
 }
 
@@ -63,6 +50,18 @@ extension ProductHuntOutputViewController  {
             tableView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             tableView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
         ])
+    }
+    
+    func fetchImages() {
+        Task {
+            let (_, imageURLs) = try await networkServiceProtocol.performRequest()
+            for await image in await networkServiceProtocol.fetchImagesConcurrently(urls: imageURLs) {
+                if let image = image {
+                    self.images.append(image)
+                    self.addRowForImage()
+                }
+            }
+        }
     }
 }
 
@@ -82,5 +81,10 @@ extension ProductHuntOutputViewController: UITableViewDataSource {
     
     func numberOfSections(in tableView: UITableView) -> Int {
         1
+    }
+    
+    func addRowForImage() {
+        let indexPath = IndexPath(row: images.count - 1, section: 0)
+        self.tableView.insertRows(at: [indexPath], with: .automatic)
     }
 }
